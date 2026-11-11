@@ -45,8 +45,12 @@ class ThesslaGreenModbusController:
         self._holding_blocks = [
             (256, 2), (4192, 2), (4198, 1), (4208, 3), (4210, 1),
             (4224, 1), (4320, 1), (4387, 1),
-            (8192, 2), (8208, 1), (8222, 2), (8330, 2), (4704, 1), (4711, 1), (8444, 1), (4304, 2)
+            (8192, 2), (8208, 1), (8222, 2), (8330, 2), (8444, 1)
         ]
+        # Rejestry obsługiwane tylko przez część modeli / wersji firmware.
+        # Jeśli urządzenie odpowie na nie błędem Modbus, są pomijane w kolejnych odczytach.
+        self._optional_holding_blocks = [(4704, 1), (4711, 1), (4304, 2)]
+        self._unsupported_holding_blocks: set[tuple[int, int]] = set()
         self._input_blocks = [(16, 4), (22, 1)]
         self._coil_blocks = [(9, 3)]
 
@@ -84,6 +88,26 @@ class ThesslaGreenModbusController:
                 except Exception as e:
                     raise ControllerException(
                         f"Exception reading holding registers {start}-{start + count - 1}: {e}") from e
+
+            # Read optional holding registers
+            for start, count in self._optional_holding_blocks:
+                if (start, count) in self._unsupported_holding_blocks:
+                    continue
+                try:
+                    result = await self._client.read_holding_registers(address=start, count=count,
+                                                                       device_id=self._slave)
+                except Exception as e:
+                    raise ControllerException(
+                        f"Exception reading holding registers {start}-{start + count - 1}: {e}") from e
+                if result.isError():
+                    self._unsupported_holding_blocks.add((start, count))
+                    _LOGGER.warning(
+                        "Device does not support holding registers %d-%d (%s); skipping them",
+                        start, start + count - 1, result)
+                    continue
+                for i, val in enumerate(result.registers):
+                    data_holding[start + i] = val
+                _LOGGER.debug("Holding registers %d-%d read: %s", start, start + count - 1, result.registers)
 
             # Read input registers
             for start, count in self._input_blocks:

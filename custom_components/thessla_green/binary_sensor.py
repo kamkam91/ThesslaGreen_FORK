@@ -91,7 +91,11 @@ class ModbusBinarySensor(BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success
+        if not self.coordinator.last_update_success:
+            return False
+        data = self.coordinator.safe_data
+        values = data.coil if self._input_type == "coil" else data.holding
+        return self._address in values
 
     @property
     def is_on(self) -> bool | None:

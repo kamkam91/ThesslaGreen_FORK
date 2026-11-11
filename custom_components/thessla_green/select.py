@@ -183,7 +183,10 @@ class RekuperatorErvTrybSelect(SelectEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success
+        return (
+            self.coordinator.last_update_success
+            and self._address in self.coordinator.safe_data.holding
+        )
 
     @property
     def current_option(self) -> str | None:
@@ -242,7 +245,10 @@ class RekuperatorKomfortSelect(SelectEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success
+        return (
+            self.coordinator.last_update_success
+            and self._address in self.coordinator.safe_data.holding
+        )
 
     @property
     def current_option(self) -> str | None:
